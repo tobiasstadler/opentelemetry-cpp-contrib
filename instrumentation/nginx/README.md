@@ -8,7 +8,7 @@ Supported propagation types:
 
 ## Requirements
 
-* OS: Linux. Test suite currently runs on Ubuntu 18.04, 20.04, 20.10.
+* OS: Linux. Test suite currently runs on Ubuntu 18.04, 20.04, 21.10.
 * [Nginx](http://nginx.org/en/download.html)
   * both stable (`1.18.0`) and mainline (`1.19.8`)
 * Nginx modules

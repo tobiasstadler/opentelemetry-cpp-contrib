@@ -176,6 +176,7 @@ defmodule Mix.Tasks.Dockerfiles do
       && cmake -DCMAKE_BUILD_TYPE=Release \\
         -DCMAKE_INSTALL_PREFIX=/install \\
         -DCMAKE_PREFIX_PATH=/install \\
+        -DWITH_ABSEIL=ON \\
         -DWITH_OTLP=ON \\
         -DWITH_OTLP_GRPC=ON \\
         -DWITH_OTLP_HTTP=OFF \\
