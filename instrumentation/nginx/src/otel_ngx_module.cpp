@@ -20,6 +20,7 @@ extern ngx_module_t otel_ngx_module;
 #include <opentelemetry/context/context.h>
 #include <opentelemetry/exporters/otlp/otlp_grpc_exporter.h>
 #include <opentelemetry/nostd/shared_ptr.h>
+#include <opentelemetry/sdk/resource/experimental_semantic_conventions.h>
 #include <opentelemetry/sdk/trace/batch_span_processor.h>
 #include <opentelemetry/sdk/trace/id_generator.h>
 #include <opentelemetry/sdk/trace/samplers/always_off.h>
@@ -28,6 +29,7 @@ extern ngx_module_t otel_ngx_module;
 #include <opentelemetry/sdk/trace/samplers/trace_id_ratio.h>
 #include <opentelemetry/sdk/trace/simple_processor.h>
 #include <opentelemetry/sdk/trace/tracer_provider.h>
+#include <opentelemetry/trace/experimental_semantic_conventions.h>
 #include <opentelemetry/trace/provider.h>
 
 namespace trace = opentelemetry::trace;
@@ -38,10 +40,10 @@ namespace otlp = opentelemetry::exporter::otlp;
 constexpr char kOtelCtxVarPrefix[] = "opentelemetry_context_";
 
 const ScriptAttributeDeclaration kDefaultScriptAttributes[] = {
-  {"http.scheme", "$scheme"},
-  {"net.host.port", "$server_port", ScriptAttributeInt},
-  {"net.peer.ip", "$remote_addr"},
-  {"net.peer.port", "$remote_port", ScriptAttributeInt},
+  {OTEL_GET_TRACE_ATTR(AttrHttpScheme), "$scheme"},
+  {OTEL_GET_TRACE_ATTR(AttrNetHostPort), "$server_port", ScriptAttributeInt},
+  {OTEL_GET_TRACE_ATTR(AttrNetPeerIp), "$remote_addr"},
+  {OTEL_GET_TRACE_ATTR(AttrNetPeerPort), "$remote_port", ScriptAttributeInt},
 };
 
 struct OtelMainConf {
@@ -433,23 +435,23 @@ ngx_int_t StartNgxSpan(ngx_http_request_t* req) {
   context->request_span = GetTracer()->StartSpan(
     GetOperationName(req),
     {
-      {"http.method", FromNgxString(req->method_name)},
-      {"http.flavor", NgxHttpFlavor(req)},
-      {"http.target", FromNgxString(req->unparsed_uri)},
+      {OTEL_GET_TRACE_ATTR(AttrHttpMethod), FromNgxString(req->method_name)},
+      {OTEL_GET_TRACE_ATTR(AttrHttpFlavor), NgxHttpFlavor(req)},
+      {OTEL_GET_TRACE_ATTR(AttrHttpTarget), FromNgxString(req->unparsed_uri)},
     },
     startOpts);
 
   nostd::string_view serverName = GetNgxServerName(req);
   if (!serverName.empty()) {
-    context->request_span->SetAttribute("http.server_name", serverName);
+    context->request_span->SetAttribute(OTEL_GET_TRACE_ATTR(AttrHttpServerName), serverName);
   }
 
   if (req->headers_in.host) {
-    context->request_span->SetAttribute("http.host", FromNgxString(req->headers_in.host->value));
+    context->request_span->SetAttribute(OTEL_GET_TRACE_ATTR(AttrHttpHost), FromNgxString(req->headers_in.host->value));
   }
 
   if (req->headers_in.user_agent) {
-    context->request_span->SetAttribute("http.user_agent", FromNgxString(req->headers_in.user_agent->value));
+    context->request_span->SetAttribute(OTEL_GET_TRACE_ATTR(AttrHttpUserAgent), FromNgxString(req->headers_in.user_agent->value));
   }
 
   if (locConf->captureHeaders) {
@@ -503,7 +505,7 @@ ngx_int_t FinishNgxSpan(ngx_http_request_t* req) {
   }
 
   auto span = context->request_span;
-  span->SetAttribute("http.status_code", req->headers_out.status);
+  span->SetAttribute(OTEL_GET_TRACE_ATTR(AttrHttpStatusCode), req->headers_out.status);
 
   OtelNgxLocationConf* locConf = GetOtelLocationConf(req);
 
@@ -1075,7 +1077,7 @@ static ngx_int_t OtelNgxStart(ngx_cycle_t* cycle) {
   auto provider =
     nostd::shared_ptr<opentelemetry::trace::TracerProvider>(new sdktrace::TracerProvider(
       std::move(processor),
-      opentelemetry::sdk::resource::Resource::Create({{"service.name", agentConf->service.name}}),
+      opentelemetry::sdk::resource::Resource::Create({{OTEL_GET_RESOURCE_ATTR(AttrServiceName), agentConf->service.name}}),
       std::move(sampler)));
 
   opentelemetry::trace::Provider::SetTracerProvider(std::move(provider));
